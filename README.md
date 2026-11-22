@@ -1,25 +1,25 @@
 # omarchy-soft-brightness
 
-Luminosità "virtuale" per un monitor esterno quando il vero DDC/CI non funziona.
+"Virtual" brightness for an external monitor when real DDC/CI control doesn't work.
 
-Niente di nuovo lato hardware: disegna un rettangolo nero semi-trasparente, a tutto schermo, **solo sul monitor scelto**, trasparente ai click/tastiera (come facevano alcune estensioni GNOME quando DDC non era disponibile). Funziona su qualunque compositor Wayland che implementa `wlr-layer-shell` (Hyprland, quindi Omarchy, incluso).
+Nothing new on the hardware side: it draws a semi-transparent black rectangle, full-screen, **only on the chosen monitor**, click-through and keyboard-transparent (the same trick some GNOME extensions used when DDC wasn't available). Works on any Wayland compositor that implements `wlr-layer-shell` (Hyprland, and therefore Omarchy, included).
 
-## Installazione
+## Installation
 
-Installa il plugin della barra (clona questo repo in `~/.config/omarchy/plugins/`) e poi compila il demone/CLI da cui dipende:
+Install the bar plugin (clones this repo into `~/.config/omarchy/plugins/`), then build the daemon/CLI it depends on:
 
 ```
 omarchy plugin add https://github.com/TheRock892/omarchy-soft-brightness --enable
 sh ~/.config/omarchy/plugins/io.github.therock892.soft-brightness/install.sh
 ```
 
-Il secondo comando compila ed installa `omarchy-soft-brightnessd` e `omarchy-soft-brightness` in `~/.local/bin`. Nessun permesso di root, nessun servizio di sistema: è un normale client Wayland dell'utente.
+The second command builds and installs `omarchy-soft-brightnessd` and `omarchy-soft-brightness` into `~/.local/bin`. No root needed, no system service: it's a plain user Wayland client.
 
-Dipendenze richieste in compilazione: `gcc`, `pkg-config`, `wayland-scanner`, header di sviluppo `wayland-client`/`wayland-protocols`.
+Build dependencies: `gcc`, `pkg-config`, `wayland-scanner`, `wayland-client`/`wayland-protocols` development headers.
 
-Per usare solo lo strumento da riga di comando (senza il plugin della barra), clona il repo altrove e lancia `sh install.sh` da lì.
+To use only the command-line tool (without the bar plugin), clone the repo anywhere else and run `sh install.sh` from there.
 
-## Rimozione
+## Removal
 
 ```
 omarchy plugin remove io.github.therock892.soft-brightness --yes
@@ -27,44 +27,44 @@ rm -f ~/.local/bin/omarchy-soft-brightness ~/.local/bin/omarchy-soft-brightnessd
 rm -rf ~/.local/state/omarchy-soft-brightness
 ```
 
-## Uso
+## Usage
 
 ```
-omarchy-soft-brightness status        # livello attuale (0-100, 100 = luminosità piena, 0 = più scuro)
-omarchy-soft-brightness 50%           # imposta al 50% di luminosità
-omarchy-soft-brightness +10%          # aumenta di 10 punti
-omarchy-soft-brightness 10%-          # diminuisce di 10 punti
-omarchy-soft-brightness off           # nessun oscuramento (equivalente a 100%)
-omarchy-soft-brightness --monitor HDMI-A-1 50%   # forza un monitor specifico
+omarchy-soft-brightness status        # current level (0-100, 100 = full brightness, 0 = darkest)
+omarchy-soft-brightness 50%           # set brightness to 50%
+omarchy-soft-brightness +10%          # increase by 10 points
+omarchy-soft-brightness 10%-          # decrease by 10 points
+omarchy-soft-brightness off           # no dimming (equivalent to 100%)
+omarchy-soft-brightness --monitor HDMI-A-1 50%   # force a specific monitor
 ```
 
-La percentuale rappresenta la luminosità desiderata, non quanto oscurare: 100% = nessun effetto (luminosità piena). Il minimo selezionabile è **10%** (non si arriva mai a schermo completamente nero, impostato sia nel demone che nello script).
+The percentage represents the desired brightness, not how much to darken: 100% = no effect (full brightness). The minimum selectable value is **10%** (the screen never goes fully black, enforced in both the daemon and the script).
 
-## Plugin per la barra di Omarchy
+## Omarchy bar plugin
 
-Installato come plugin della barra di Omarchy (`~/.config/omarchy/plugins/io.github.therock892.soft-brightness/`): icona nella barra con popup a slider (10-100%), rotellina del mouse per variare di 5 punti, auto-refresh mentre il popup è aperto. È solo un'interfaccia sopra lo script `omarchy-soft-brightness` — non parla mai direttamente al socket del demone.
+Also installed as an Omarchy bar plugin (`~/.config/omarchy/plugins/io.github.therock892.soft-brightness/`): bar icon with a slider popup (10-100%), mouse wheel to adjust by 5 points, auto-refresh while the popup is open. It's just a front end over the `omarchy-soft-brightness` script — it never talks to the daemon's socket directly.
 
-Comandi utili se lo si modifica:
+Useful commands if you modify it:
 ```
-omarchy-shell shell rescanPlugins   # ricarica dopo modifiche al Panel.qml
+omarchy-shell shell rescanPlugins   # reload after editing Panel.qml
 omarchy plugin enable io.github.therock892.soft-brightness
 omarchy plugin disable io.github.therock892.soft-brightness
 ```
 
-Senza `--monitor`, individua automaticamente il primo monitor esterno collegato (qualsiasi non `eDP`/`LVDS`/`DSI`) tramite `hyprctl monitors`.
+Without `--monitor`, it auto-detects the first connected external monitor (anything not `eDP`/`LVDS`/`DSI`) via `hyprctl monitors`.
 
-Il demone (`omarchy-soft-brightnessd`) si avvia da solo al primo comando e resta in esecuzione finché il monitor non viene scollegato o non si invia `QUIT`. Il livello scelto è persistito in `~/.local/state/omarchy-soft-brightness/<monitor>.level` e ripristinato automaticamente al prossimo avvio del demone.
+The daemon (`omarchy-soft-brightnessd`) starts itself on the first command and keeps running until the monitor is unplugged or it receives `QUIT`. The chosen level is persisted in `~/.local/state/omarchy-soft-brightness/<monitor>.level` and restored automatically the next time the daemon starts.
 
-## Collegarlo ai tasti Fn
+## Binding it to the Fn keys
 
-Per usare gli stessi tasti luminosità (Fn+F5/F6) anche sul monitor esterno quando è collegato, basta aggiungere un bind in Hyprland che richiama questo script al posto di (o in aggiunta a) `omarchy-brightness-display`, puntando esplicitamente al monitor esterno.
+To use the same brightness keys (Fn+F5/F6) for the external monitor too when it's connected, just add a Hyprland bind that calls this script instead of (or in addition to) `omarchy-brightness-display`, pointing explicitly at the external monitor.
 
-## Limiti conosciuti
+## Known limitations
 
-- È un trucco visivo (oscura con un overlay nero), non modifica la vera retroilluminazione: a livelli alti di oscuramento il contrasto e la qualità percepita dell'immagine calano, come con qualsiasi tecnica gamma/overlay software (stesso compromesso che aveva l'estensione GNOME equivalente).
-- Se il monitor viene scollegato e ricollegato, il demone esistente termina (evento `closed` del protocollo) e va semplicemente richiamato di nuovo il comando: si auto-rialza.
-- Un solo demone per monitor: comandi concorrenti sullo stesso monitor sono serializzati dal socket di controllo, nessun problema per l'uso normale (tasti, script).
+- It's a visual trick (darkens with a black overlay), it doesn't change the real backlight: at high dimming levels contrast and perceived image quality drop, as with any software gamma/overlay technique (the same trade-off the equivalent GNOME extension had).
+- If the monitor is unplugged and replugged, the existing daemon exits (the protocol's `closed` event) and the command just needs to be called again: it comes back up on its own.
+- One daemon per monitor: concurrent commands on the same monitor are serialized by the control socket, no issue for normal use (keys, scripts).
 
-## Licenza
+## License
 
-MIT, vedi `LICENSE`.
+MIT, see `LICENSE`.

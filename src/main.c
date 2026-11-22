@@ -2,12 +2,11 @@
  * omarchy-soft-brightnessd -- per-monitor "virtual brightness" for Wayland
  * compositors that implement wlr-layer-shell (Hyprland/Omarchy included).
  *
- * Why this exists: on this machine, DDC/CI brightness control for an
- * external monitor fails, because the HDMI port is actually driven via the
- * SoC's DisplayPort-AUX tunnel (bus named "dpu_dp_aux"), and that tunnel
- * does not proxy DDC/CI read/write cycles correctly (see
- * luminosita-monitor-esterno.md in the project root for the full
- * diagnosis). This tool works around that the same way some GNOME
+ * Why this exists: on some machines, DDC/CI brightness control for an
+ * external monitor fails -- for example because the HDMI port is actually
+ * driven via the SoC's DisplayPort-AUX tunnel (bus named "dpu_dp_aux"), and
+ * that tunnel does not proxy DDC/CI read/write cycles correctly. This tool
+ * works around that the same way some GNOME
  * extensions did: instead of asking the monitor's own backlight to change,
  * it draws a black, click-through overlay on top of ONE chosen output and
  * varies its opacity -- same trick, reimplemented for a wlr-layer-shell
