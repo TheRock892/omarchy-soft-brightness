@@ -1,0 +1,129 @@
+#!/bin/bash
+# omarchy-soft-brightness -- virtual ("soft") brightness for a monitor that
+# does not support real DDC/CI brightness, via a black click-through overlay
+# on a wlr-layer-shell compositor (Hyprland/Omarchy).
+#
+# Usage:
+#   omarchy-soft-brightness [--monitor NAME] [+N%|N%-|N%|status|off|on]
+#
+# With no step argument, prints the current level (0-100, 100 = full
+# brightness/no dimming, 0 = darkest).
+# Mirrors the argument style of Omarchy's own omarchy-brightness-display.
+
+set -euo pipefail
+
+# Kept in sync with MIN_BRIGHTNESS_LEVEL in src/main.c, which enforces the
+# same floor regardless of caller.
+MIN_LEVEL=10
+
+BIN_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+DAEMON="$BIN_DIR/omarchy-soft-brightnessd"
+[[ -x $DAEMON ]] || DAEMON="omarchy-soft-brightnessd" # fall back to PATH if installed system-wide
+
+monitor=""
+
+while (( $# > 0 )); do
+  case "$1" in
+  --monitor)
+    (( $# >= 2 )) || { echo "missing argument for --monitor" >&2; exit 1; }
+    monitor="$2"
+    shift 2
+    ;;
+  *)
+    break
+    ;;
+  esac
+done
+
+monitor_is_internal() {
+  [[ $1 =~ ^(eDP|LVDS|DSI)- ]]
+}
+
+detect_external_monitor() {
+  hyprctl monitors -j 2>/dev/null | python3 -c '
+import json, sys
+try:
+    mons = json.load(sys.stdin)
+except Exception:
+    sys.exit(1)
+for m in mons:
+    name = m.get("name", "")
+    if not name.startswith(("eDP", "LVDS", "DSI")):
+        print(name)
+        sys.exit(0)
+sys.exit(1)
+'
+}
+
+if [[ -z $monitor ]]; then
+  monitor="$(detect_external_monitor)" || {
+    echo "omarchy-soft-brightness: no external monitor found (pass --monitor NAME)" >&2
+    exit 1
+  }
+fi
+
+if monitor_is_internal "$monitor"; then
+  echo "omarchy-soft-brightness: '$monitor' looks like the internal panel; this tool is for external monitors" >&2
+  exit 1
+fi
+
+send() {
+  "$DAEMON" send "$monitor" "$@"
+}
+
+ensure_daemon() {
+  send GET >/dev/null 2>&1 && return 0
+
+  # No daemon answering yet: start one in the background and wait briefly
+  # for its socket to come up.
+  nohup "$DAEMON" daemon "$monitor" >/dev/null 2>&1 &
+  disown
+
+  for _ in $(seq 1 20); do
+    sleep 0.1
+    send GET >/dev/null 2>&1 && return 0
+  done
+
+  echo "omarchy-soft-brightness: daemon for '$monitor' did not start (is $monitor connected?)" >&2
+  return 1
+}
+
+ensure_daemon
+
+step="${1:-}"
+
+if [[ -z $step || $step == "status" ]]; then
+  send GET
+  exit 0
+fi
+
+case "$step" in
+off)
+  # "off" the dimming effect, i.e. full brightness.
+  send SET 100 >/dev/null
+  exit 0
+  ;;
+on)
+  # "on" has no single obvious target level; leave the current level as-is.
+  send GET
+  exit 0
+  ;;
+esac
+
+current="$(send GET)"
+
+if [[ $step =~ ^([0-9]+)%$ ]]; then
+  target="${BASH_REMATCH[1]}"
+elif [[ $step =~ ^\+([0-9]+)%$ ]]; then
+  target=$((current + BASH_REMATCH[1]))
+elif [[ $step =~ ^([0-9]+)%-$ ]]; then
+  target=$((current - BASH_REMATCH[1]))
+else
+  echo "usage: omarchy-soft-brightness [--monitor NAME] [+N%|N%-|N%|status|off|on]" >&2
+  exit 1
+fi
+
+(( target < MIN_LEVEL )) && target=$MIN_LEVEL
+(( target > 100 )) && target=100
+
+send SET "$target"
